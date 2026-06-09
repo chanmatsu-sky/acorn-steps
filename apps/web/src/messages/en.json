@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "baby-log",
+    "tagline": "Feeding, diaper, sleep — together."
+  },
+  "kind": {
+    "feed": "Feed",
+    "diaper": "Diaper",
+    "sleep": "Sleep",
+    "note": "Note"
+  },
+  "nav": {
+    "home": "Home",
+    "stats": "Stats",
+    "family": "Family",
+    "settings": "Settings"
+  },
+  "home": {
+    "sinceLastFeed": "Since last feed",
+    "byPerson": "Logged by {name}",
+    "partnerActive": "{name} is logging {kind}",
+    "recent": "Recent",
+    "viewAll": "View all",
+    "now": "now"
+  },
+  "compose": {
+    "record": "Record"
+  }
+}

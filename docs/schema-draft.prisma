@@ -1,0 +1,528 @@
+// baby-log Prisma Schema v0 (draft)
+//
+// 設計の出典:
+// - sprout-track  https://github.com/Oak-and-Sprout/sprout-track
+// - babybuddy     https://github.com/babybuddy/babybuddy (BSD-2-Clause)
+//
+// 設計方針:
+//   1. Family がマルチテナンシーの境界 (sprout-track式)
+//   2. User と Caretaker を分離: User=認証、Caretaker=記録者
+//      (User無しのゲスト記録、保育士・祖父母を許可するため)
+//   3. ソフトデリート (deletedAt) で履歴保存
+//   4. 「次は誰の番」のための CareRotation を独自追加
+//   5. オフライン同期用の clientId と clientCreatedAt を全ログに追加 (冪等性)
+//   6. i18n: ユーザー単位の locale (ja/en/vi)
+//
+// 未確定: babybuddyの "fortified breast milk" / "parent fed / self fed" を入れるかは
+//        sprout-track試用後に判断。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────────────────────────
+// Enums
+// ───────────────────────────────────────────────
+
+enum Locale {
+  ja
+  en
+  vi
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNSPECIFIED
+}
+
+enum MemberRole {
+  OWNER   // 家族作成者、全権
+  PARENT  // 親、編集権
+  HELPER  // 祖父母・保育士、編集権 (削除不可)
+  VIEWER  // 閲覧のみ
+}
+
+enum FeedType {
+  BREAST   // 直接母乳
+  BOTTLE   // 哺乳瓶 (中身は BottleContent)
+  SOLIDS   // 離乳食
+}
+
+enum BottleContent {
+  BREAST_MILK
+  FORMULA
+  MIXED       // 母乳+ミルク
+  OTHER
+}
+
+enum BreastSide {
+  LEFT
+  RIGHT
+  BOTH
+}
+
+enum DiaperType {
+  WET
+  DIRTY
+  BOTH
+}
+
+enum SleepType {
+  NAP
+  NIGHT_SLEEP
+}
+
+enum SleepQuality {
+  POOR
+  FAIR
+  GOOD
+  EXCELLENT
+}
+
+enum MeasurementKind {
+  HEIGHT
+  WEIGHT
+  HEAD_CIRCUMFERENCE
+  TEMPERATURE
+}
+
+// ───────────────────────────────────────────────
+// Auth / Users (Auth.js 互換構造)
+// ───────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  locale        Locale    @default(ja)
+  timezone      String    @default("Asia/Tokyo")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  accounts     Account[]
+  sessions     Session[]
+  memberships  FamilyMember[]
+  caretakers   Caretaker[]
+  pushSubs     PushSubscription[]
+
+  @@index([deletedAt])
+}
+
+// Auth.js OAuth account linking
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ───────────────────────────────────────────────
+// Family (マルチテナンシー)
+// ───────────────────────────────────────────────
+
+model Family {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  locale    Locale   @default(ja)
+  timezone  String   @default("Asia/Tokyo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  members     FamilyMember[]
+  babies      Baby[]
+  caretakers  Caretaker[]
+  invitations FamilyInvite[]
+  rotations   CareRotation[]
+  feedLogs    FeedLog[]
+  diaperLogs  DiaperLog[]
+  sleepLogs   SleepLog[]
+  measurements Measurement[]
+  notes       Note[]
+
+  @@index([deletedAt])
+}
+
+model FamilyMember {
+  familyId  String
+  userId    String
+  role      MemberRole
+  joinedAt  DateTime   @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([familyId, userId])
+  @@index([userId])
+}
+
+model FamilyInvite {
+  id        String    @id @default(cuid())
+  familyId  String
+  token     String    @unique // 招待リンクトークン
+  email     String?
+  role      MemberRole @default(PARENT)
+  expiresAt DateTime
+  acceptedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([token])
+}
+
+// ───────────────────────────────────────────────
+// Baby
+// ───────────────────────────────────────────────
+
+model Baby {
+  id        String    @id @default(cuid())
+  familyId  String
+  firstName String
+  lastName  String?
+  birthDate DateTime
+  birthTime DateTime?
+  gender    Gender    @default(UNSPECIFIED)
+  avatarUrl String?
+
+  // 警告閾値 (分単位) — 0 で無効
+  feedWarningMinutes   Int @default(180)
+  diaperWarningMinutes Int @default(120)
+
+  inactive  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  feedLogs     FeedLog[]
+  diaperLogs   DiaperLog[]
+  sleepLogs    SleepLog[]
+  measurements Measurement[]
+  notes        Note[]
+  activeFeed   ActiveFeedSession?
+
+  @@index([familyId])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────────────────────────
+// Caretaker (記録者)
+// ユーザー登録なしでも記録可能。User とリンク可能。
+// ───────────────────────────────────────────────
+
+model Caretaker {
+  id        String    @id @default(cuid())
+  familyId  String
+  userId    String?   // 紐づくUserがあれば
+  name      String
+  kind      String?   // "parent" | "grandparent" | "nanny" | "daycare" 等、自由テキスト
+  pin       String?   // クイック切替用 (4桁PIN)
+  color     String?   // タイムライン表示色
+  inactive  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  feedLogs     FeedLog[]
+  diaperLogs   DiaperLog[]
+  sleepLogs    SleepLog[]
+  measurements Measurement[]
+  notes        Note[]
+  rotationTurns CareRotationTurn[]
+
+  @@index([familyId])
+  @@index([userId])
+}
+
+// ───────────────────────────────────────────────
+// "次は誰の番" ローテーション (差別化機能)
+// ───────────────────────────────────────────────
+
+model CareRotation {
+  id        String   @id @default(cuid())
+  familyId  String
+  babyId    String?  // null=家族全体
+  activity  String   // "feeding" | "diaper" | "night_wake" 等
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  turns  CareRotationTurn[]
+
+  @@index([familyId])
+}
+
+model CareRotationTurn {
+  id          String   @id @default(cuid())
+  rotationId  String
+  caretakerId String
+  order       Int      // 順番 (0始まり)
+
+  rotation  CareRotation @relation(fields: [rotationId], references: [id], onDelete: Cascade)
+  caretaker Caretaker    @relation(fields: [caretakerId], references: [id], onDelete: Cascade)
+
+  @@unique([rotationId, order])
+  @@index([caretakerId])
+}
+
+// ───────────────────────────────────────────────
+// 活動ログ共通
+// ───────────────────────────────────────────────
+// オフライン同期用フィールド (全ログに共通):
+//   clientId         — クライアント生成のID。冪等性キー。
+//   clientCreatedAt  — クライアント側の作成時刻 (時計ズレ対策)
+//   syncedAt         — サーバー受領時刻
+// 一意性: (familyId, clientId) で冪等にupsert
+
+// ───────────────────────────────────────────────
+// 授乳ログ
+// ───────────────────────────────────────────────
+
+model FeedLog {
+  id        String   @id @default(cuid())
+  clientId  String
+  familyId  String
+  babyId    String
+  caretakerId String?
+
+  type      FeedType
+  side      BreastSide?     // BREAST時のみ
+  startedAt DateTime
+  endedAt   DateTime?
+  durationSec Int?          // 計算結果キャッシュ
+
+  // BOTTLE時
+  bottleContent BottleContent?
+  amountMl      Float?       // ml統一 (UI側で表示単位変換)
+
+  // SOLIDS時
+  solidFood String?
+  amountG   Float?
+
+  notes     String?
+
+  clientCreatedAt DateTime
+  syncedAt        DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  family    Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  baby      Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  caretaker Caretaker? @relation(fields: [caretakerId], references: [id], onDelete: SetNull)
+
+  @@unique([familyId, clientId])
+  @@index([familyId, babyId, startedAt])
+  @@index([deletedAt])
+}
+
+// 進行中の授乳セッション (両親リアルタイム同期用)
+// 1赤ちゃんあたり1セッション
+model ActiveFeedSession {
+  babyId      String   @id
+  familyId    String
+  caretakerId String?
+  type        FeedType
+  side        BreastSide?
+  startedAt   DateTime
+  pausedAt    DateTime?
+  totalPausedSec Int @default(0)
+  updatedAt   DateTime @updatedAt
+
+  baby Baby @relation(fields: [babyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+}
+
+// ───────────────────────────────────────────────
+// オムツログ
+// ───────────────────────────────────────────────
+
+model DiaperLog {
+  id        String   @id @default(cuid())
+  clientId  String
+  familyId  String
+  babyId    String
+  caretakerId String?
+
+  type      DiaperType
+  time      DateTime
+  color     String?     // "yellow" | "green" | "brown" | "black"
+  hasBlowout Boolean   @default(false)
+  notes     String?
+
+  clientCreatedAt DateTime
+  syncedAt        DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  family    Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  baby      Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  caretaker Caretaker? @relation(fields: [caretakerId], references: [id], onDelete: SetNull)
+
+  @@unique([familyId, clientId])
+  @@index([familyId, babyId, time])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────────────────────────
+// 睡眠ログ
+// ───────────────────────────────────────────────
+
+model SleepLog {
+  id        String   @id @default(cuid())
+  clientId  String
+  familyId  String
+  babyId    String
+  caretakerId String?
+
+  type      SleepType
+  startedAt DateTime
+  endedAt   DateTime?
+  durationSec Int?
+  quality   SleepQuality?
+  location  String?
+  notes     String?
+
+  clientCreatedAt DateTime
+  syncedAt        DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  family    Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  baby      Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  caretaker Caretaker? @relation(fields: [caretakerId], references: [id], onDelete: SetNull)
+
+  @@unique([familyId, clientId])
+  @@index([familyId, babyId, startedAt])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────────────────────────
+// 計測 (身長・体重・体温・頭囲)
+// ───────────────────────────────────────────────
+
+model Measurement {
+  id        String   @id @default(cuid())
+  clientId  String
+  familyId  String
+  babyId    String
+  caretakerId String?
+
+  kind      MeasurementKind
+  value     Float           // SI単位で正規化保存 (cm, kg, °C)
+  measuredAt DateTime
+  notes     String?
+
+  clientCreatedAt DateTime
+  syncedAt        DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  family    Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  baby      Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  caretaker Caretaker? @relation(fields: [caretakerId], references: [id], onDelete: SetNull)
+
+  @@unique([familyId, clientId])
+  @@index([familyId, babyId, kind, measuredAt])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────────────────────────
+// メモ
+// ───────────────────────────────────────────────
+
+model Note {
+  id        String   @id @default(cuid())
+  clientId  String
+  familyId  String
+  babyId    String?
+  caretakerId String?
+
+  time     DateTime
+  content  String
+  category String?
+
+  clientCreatedAt DateTime
+  syncedAt        DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  family    Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  baby      Baby?     @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  caretaker Caretaker? @relation(fields: [caretakerId], references: [id], onDelete: SetNull)
+
+  @@unique([familyId, clientId])
+  @@index([familyId, babyId, time])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────────────────────────
+// Push通知 (Web Push / VAPID)
+// ───────────────────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

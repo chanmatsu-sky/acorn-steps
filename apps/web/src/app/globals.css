@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm Linen palette ── light */
+  --color-canvas: oklch(0.985 0.012 75);        /* リネン背景 */
+  --color-surface: oklch(0.995 0.006 75);       /* 暖色off-white */
+  --color-surface-2: oklch(0.965 0.014 70);     /* 一段沈んだ面 */
+  --color-ink: oklch(0.22 0.025 50);            /* 本文 — 暖色寄り暗色 */
+  --color-ink-2: oklch(0.42 0.020 50);          /* 副次 */
+  --color-ink-3: oklch(0.60 0.018 50);          /* 三次/プレースホルダ */
+  --color-line: oklch(0.92 0.012 70);           /* 罫線 */
+
+  --color-honey: oklch(0.66 0.155 65);          /* primary 蜂蜜 */
+  --color-honey-dim: oklch(0.55 0.140 65);
+  --color-sage: oklch(0.62 0.060 145);          /* secondary セージ */
+  --color-rose: oklch(0.68 0.105 25);           /* accent ローズ */
+
+  --color-feed: oklch(0.66 0.155 65);
+  --color-diaper: oklch(0.62 0.060 145);
+  --color-sleep: oklch(0.58 0.095 265);         /* くすんだ藍 */
+  --color-note: oklch(0.65 0.070 320);          /* くすんだ藤 */
+
+  --radius-card: 1.25rem;
+  --radius-tile: 1.5rem;
+
+  --font-sans: 'Inter', 'Noto Sans JP', 'Noto Sans', system-ui, sans-serif;
+  --font-numeric: 'Inter', 'Geist Mono', ui-monospace, monospace;
+
+  --shadow-card: 0 1px 2px oklch(0.30 0.030 60 / 0.06),
+                 0 8px 24px oklch(0.30 0.030 60 / 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme inline {
+    --color-canvas: oklch(0.165 0.018 50);
+    --color-surface: oklch(0.205 0.020 50);
+    --color-surface-2: oklch(0.245 0.022 50);
+    --color-ink: oklch(0.94 0.012 70);
+    --color-ink-2: oklch(0.74 0.014 65);
+    --color-ink-3: oklch(0.56 0.014 60);
+    --color-line: oklch(0.30 0.020 55);
+
+    --color-honey: oklch(0.78 0.150 70);
+    --color-honey-dim: oklch(0.66 0.140 65);
+    --color-sage: oklch(0.74 0.060 145);
+    --color-rose: oklch(0.78 0.100 25);
+
+    --color-feed: oklch(0.78 0.150 70);
+    --color-diaper: oklch(0.74 0.060 145);
+    --color-sleep: oklch(0.72 0.085 265);
+    --color-note: oklch(0.76 0.070 320);
+
+    --shadow-card: 0 1px 2px oklch(0 0 0 / 0.35),
+                   0 8px 24px oklch(0 0 0 / 0.25);
+  }
+}
+
+html, body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Live pulse for partner-active indicator */
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+.pulse-dot { animation: breathe 2.2s ease-in-out infinite; }
+
+/* Press feedback */
+.press {
+  transition: transform 120ms ease, box-shadow 200ms ease;
+}
+.press:active { transform: scale(0.97); }

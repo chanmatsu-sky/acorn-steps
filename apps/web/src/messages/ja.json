@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "baby-log",
+    "tagline": "授乳・オムツ・睡眠を、両親で。"
+  },
+  "kind": {
+    "feed": "授乳",
+    "diaper": "オムツ",
+    "sleep": "睡眠",
+    "note": "メモ"
+  },
+  "nav": {
+    "home": "ホーム",
+    "stats": "グラフ",
+    "family": "家族",
+    "settings": "設定"
+  },
+  "home": {
+    "sinceLastFeed": "前回授乳から",
+    "byPerson": "{name} が記録",
+    "partnerActive": "{name} が{kind}中",
+    "recent": "最近",
+    "viewAll": "すべて見る",
+    "now": "いま"
+  },
+  "compose": {
+    "record": "記録する"
+  }
+}

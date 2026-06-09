@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "baby-log",
+    "tagline": "Bú, tã, ngủ — cùng nhau ghi lại."
+  },
+  "kind": {
+    "feed": "Bú",
+    "diaper": "Tã",
+    "sleep": "Ngủ",
+    "note": "Ghi chú"
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "stats": "Biểu đồ",
+    "family": "Gia đình",
+    "settings": "Cài đặt"
+  },
+  "home": {
+    "sinceLastFeed": "Từ lần bú trước",
+    "byPerson": "Ghi bởi {name}",
+    "partnerActive": "{name} đang ghi {kind}",
+    "recent": "Gần đây",
+    "viewAll": "Xem tất cả",
+    "now": "ngay"
+  },
+  "compose": {
+    "record": "Ghi"
+  }
+}
