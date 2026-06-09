@@ -1,0 +1,53 @@
+name: 💡 Feature request
+description: Suggest a new capability
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What pain are you trying to solve? Be specific about the situation.
+      placeholder: At 3am with one hand, switching breast side takes too many taps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would the ideal experience look like?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about and why they're worse
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Core (feeding/diaper/sleep recording)
+        - Sharing & realtime
+        - Notifications
+        - Stats & graphs
+        - Offline & sync
+        - Auth / family management
+        - i18n / accessibility
+        - Developer experience
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched for existing feature requests
+          required: true
+        - label: This aligns with the project's scope (baby tracking PWA)
+          required: true

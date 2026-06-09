@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/chanmatsu-sky/acorn-steps/discussions
+    about: Ask open-ended questions or share ideas
+  - name: 🔒 Security advisory
+    url: https://github.com/chanmatsu-sky/acorn-steps/security/advisories/new
+    about: Report a vulnerability privately

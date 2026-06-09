@@ -1,0 +1,21 @@
+name: ❓ Question
+description: Ask about usage, setup, or design
+labels: ['question']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For open-ended discussion, consider [Discussions](https://github.com/chanmatsu-sky/acorn-steps/discussions) instead.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Docs you read, things you tested — helps us answer better

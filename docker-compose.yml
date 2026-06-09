@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: acorn-steps-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: acorn
+      POSTGRES_PASSWORD: acorn
+      POSTGRES_DB: acornsteps
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - '5433:5432'
+    volumes:
+      - acorn-steps-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U acorn -d acornsteps']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  acorn-steps-pgdata:
+    name: acorn-steps-pgdata
